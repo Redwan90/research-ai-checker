@@ -42,7 +42,8 @@ if uploaded_file:
         st.text_area("Peer Review (AI Generated)", review, height=400)
 
     if st.checkbox("✨ Show corrected references in APA 7 style"):
-        corrected_refs = correct_references(ref_report.get("Total References", []))
+        references = ref_report.get("Extracted References", [])
+        corrected_refs = correct_references(references)
         for ref in corrected_refs:
             st.markdown(f"- {ref}")
 
