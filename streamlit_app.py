@@ -1,5 +1,5 @@
 import streamlit as st
-from file_parser import extract_text_from_pdf
+from file_parser import extract_text_from_pdf, extract_text_from_docx
 from ref_checker import check_references
 from ollama_wrapper import generate_review
 from citation_formatter import correct_references
@@ -18,13 +18,19 @@ This tool checks:
 - 📄 Generate PDF Report
 """)
 
-uploaded_file = st.file_uploader("Upload your Research Article (PDF only)", type=["pdf"])
+uploaded_file = st.file_uploader("Upload your Research Article (PDF or DOCX)", type=["pdf", "docx"])
 
 author_name = st.text_input("Enter main author name (optional for self-citation check)")
 
 if uploaded_file:
-    with st.spinner("Extracting text from PDF..."):
-        text = extract_text_from_pdf(uploaded_file)
+    with st.spinner("Extracting text from document..."):
+        if uploaded_file.name.endswith(".pdf"):
+            text = extract_text_from_pdf(uploaded_file)
+        elif uploaded_file.name.endswith(".docx"):
+            text = extract_text_from_docx(uploaded_file)
+        else:
+            st.error("Unsupported file format. Please upload a PDF or DOCX.")
+            st.stop()
 
     st.subheader("📑 Reference Analysis")
     ref_report = check_references(text, author_name)
@@ -47,4 +53,4 @@ if uploaded_file:
     st.success("Done ✅")
 
 else:
-    st.info("Please upload a PDF file to begin.")
+    st.info("Please upload a PDF or DOCX file to begin.")
