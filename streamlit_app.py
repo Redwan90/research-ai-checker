@@ -20,12 +20,13 @@ This tool checks:
 uploaded_file = st.file_uploader("Upload your Research Article (PDF or DOCX)", type=["pdf", "docx"])
 
 def extract_author_name(text):
-    # Attempt to capture author name from the first page (assumes it's under the title)
     match = re.search(r"\n(.*?)\n.*?\n", text)
     if match:
-        possible_author = match.group(1)
-        if 3 < len(possible_author) < 100:
-            return possible_author.strip()
+        raw_line = match.group(1)
+        clean_line = re.sub(r"[\d\*]+", "", raw_line)  # Remove digits and asterisks
+        clean_line = re.sub(r"\s{2,}", " ", clean_line)  # Fix extra spacing
+        clean_line = clean_line.strip(",; \n")
+        return clean_line
     return ""
 
 if uploaded_file:
