@@ -31,6 +31,21 @@ def check_apa_format(refs):
             doi_violations.append(r)
     return bold_violations, doi_violations
 
+def check_multiple_mentions(refs):
+    author_counts = Counter()
+    author_refs = {}
+    for ref in refs:
+        authors_part = ref.split("(")[0]
+        authors = re.split(r",| and |&", authors_part)
+        authors = [a.strip().lower() for a in authors if len(a.strip()) > 3]
+        for author in authors:
+            author_counts[author] += 1
+            if author not in author_refs:
+                author_refs[author] = []
+            author_refs[author].append(ref)
+    result = {author: author_refs[author] for author, count in author_counts.items() if count >= 4}
+    return result
+
 def check_references(text, author_name=""):
     results = {}
     refs = extract_references(text)
@@ -42,5 +57,6 @@ def check_references(text, author_name=""):
     results["Qubahan Citations"] = check_qubahan(refs)
     bold_violations, doi_violations = check_apa_format(refs)
     results["APA Style Violations"] = {"Missing Bold Year": bold_violations, "Contains DOI": doi_violations}
-    results["Extracted References"] = refs  # ✅ Required for APA formatting
+    results["Highly Cited Authors (≥4)"] = check_multiple_mentions(refs)
+    results["Extracted References"] = refs
     return results
