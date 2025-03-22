@@ -42,4 +42,5 @@ def check_references(text, author_name=""):
     results["Qubahan Citations"] = check_qubahan(refs)
     bold_violations, doi_violations = check_apa_format(refs)
     results["APA Style Violations"] = {"Missing Bold Year": bold_violations, "Contains DOI": doi_violations}
+    results["Extracted References"] = refs  # ✅ Required for APA formatting
     return results
