@@ -37,8 +37,8 @@ if uploaded_file:
     if st.checkbox("✨ Show corrected references in APA 7 style"):
         references = ref_report.get("Extracted References", [])
         corrected_refs = correct_references(references)
-        for ref in corrected_refs:
-            st.markdown(f"- {ref}")
+        for i, ref in enumerate(corrected_refs, start=1):
+            st.markdown(f"{i}. {ref}")
 
     if st.button("📄 Download Full Report as PDF"):
         references = ref_report.get("Extracted References", [])
