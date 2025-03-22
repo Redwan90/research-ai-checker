@@ -50,25 +50,29 @@ if uploaded_file:
     ref_report = check_references(text, author_name)
     st.write(ref_report)
 
+    references = ref_report.get("Extracted References", [])
+
     if "Highly Cited Authors (≥4)" in ref_report:
         cited = ref_report["Highly Cited Authors (≥4)"]
         if cited:
             st.subheader("👥 Authors Cited 4+ Times")
             for author, refs in cited.items():
                 st.markdown(f"**{author.title()}** — {len(refs)} times")
-                for i, ref in enumerate(refs, start=1):
-                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{i}. {ref}")
+                for ref in refs:
+                    try:
+                        index = references.index(ref) + 1
+                    except ValueError:
+                        index = "?"
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{index}. {ref}")
         else:
             st.info("No authors cited 4 or more times.")
 
     if st.checkbox("✨ Show corrected references in APA 7 style"):
-        references = ref_report.get("Extracted References", [])
         corrected_refs = correct_references(references)
         for i, ref in enumerate(corrected_refs, start=1):
             st.markdown(f"{i}. {ref}")
 
     if st.button("📄 Download Full Report as PDF"):
-        references = ref_report.get("Extracted References", [])
         corrected_refs = correct_references(references)
         pdf = generate_pdf_report(ref_report, corrected_refs, "")
         st.download_button("Download PDF", pdf, file_name="article_review_report.pdf")
