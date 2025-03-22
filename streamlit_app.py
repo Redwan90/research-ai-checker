@@ -139,8 +139,13 @@ if uploaded_file:
             "Table and Figure Captions": table_issues
         }
         pdf = generate_pdf_report(ref_report, corrected_refs, "", formatting_results)
-        #st.download_button("📥 Download PDF", pdf, file_name="QAJ_AI_Report.pdf")
-        st.download_button("📥 Download PDF", data=pdf.getvalue(), file_name="QAJ_AI_Report.pdf", mime="application/pdf")
+        st.download_button(
+            label="📥 Download PDF",
+            data=pdf.getvalue(),               # <-- ✅ CONVERT BytesIO to raw bytes
+            file_name="QAJ_AI_Report.pdf",
+            mime="application/pdf"
+        )
+
 
 
 else:
