@@ -3,6 +3,7 @@ from file_parser import extract_text_from_pdf, extract_text_from_docx
 from ref_checker import check_references
 from citation_formatter import correct_references
 from report_generator import generate_pdf_report
+import re
 
 st.set_page_config(page_title="Research Paper Checker", layout="wide")
 st.title("🧠 Research Paper Checker (Free AI Tool)")
@@ -18,7 +19,14 @@ This tool checks:
 
 uploaded_file = st.file_uploader("Upload your Research Article (PDF or DOCX)", type=["pdf", "docx"])
 
-author_name = st.text_input("Enter main author name (optional for self-citation check)")
+def extract_author_name(text):
+    # Attempt to capture author name from the first page (assumes it's under the title)
+    match = re.search(r"\n(.*?)\n.*?\n", text)
+    if match:
+        possible_author = match.group(1)
+        if 3 < len(possible_author) < 100:
+            return possible_author.strip()
+    return ""
 
 if uploaded_file:
     with st.spinner("Extracting text from document..."):
@@ -29,6 +37,12 @@ if uploaded_file:
         else:
             st.error("Unsupported file format. Please upload a PDF or DOCX.")
             st.stop()
+
+    author_name = extract_author_name(text)
+    if author_name:
+        st.markdown(f"**Detected author name:** `{author_name}`")
+    else:
+        st.warning("Could not detect author name from the paper. Self-citation check may be skipped.")
 
     st.subheader("📑 Reference Analysis")
     ref_report = check_references(text, author_name)
