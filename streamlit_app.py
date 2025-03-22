@@ -58,12 +58,13 @@ if uploaded_file:
             st.subheader("👥 Authors Cited 4+ Times")
             for author, refs in cited.items():
                 st.markdown(f"**{author.title()}** — {len(refs)} times")
+                shown = set()
                 for ref in refs:
-                    try:
-                        index = references.index(ref) + 1
-                    except ValueError:
-                        index = "?"
-                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{index}. {ref}")
+                    if ref not in shown:
+                        index_list = [i + 1 for i, r in enumerate(references) if r == ref]
+                        for idx in index_list:
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{idx}. {ref}")
+                        shown.add(ref)
         else:
             st.info("No authors cited 4 or more times.")
 
