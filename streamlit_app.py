@@ -35,12 +35,15 @@ if uploaded_file:
     st.write(ref_report)
 
     if st.checkbox("✨ Show corrected references in APA 7 style"):
-        corrected_refs = correct_references(ref_report.get("Extracted References", []))
+        references = ref_report.get("Extracted References", [])
+        corrected_refs = correct_references(references)
         for ref in corrected_refs:
             st.markdown(f"- {ref}")
-    
+
     if st.button("📄 Download Full Report as PDF"):
-        pdf = generate_pdf_report(ref_report, corrected_refs, "")  # Removed review section
+        references = ref_report.get("Extracted References", [])
+        corrected_refs = correct_references(references)
+        pdf = generate_pdf_report(ref_report, corrected_refs, "")
         st.download_button("Download PDF", pdf, file_name="article_review_report.pdf")
 
     st.success("Done ✅")
