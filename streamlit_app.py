@@ -128,7 +128,7 @@ if uploaded_file:
             mime="text/plain"
         )
 
-    # Download full PDF report
+    # PDF REPORT GENERATION AND DOWNLOAD
     if st.button("📄 Download Full Report as PDF"):
         corrected_refs = correct_references(references)
         formatting_results = {
@@ -138,13 +138,21 @@ if uploaded_file:
             "Heading Structure": heading_issues,
             "Table and Figure Captions": table_issues
         }
-        pdf = generate_pdf_report(ref_report, corrected_refs, "", formatting_results)
+
+        # Generate PDF report (returns BytesIO)
+        pdf_buffer = generate_pdf_report(ref_report, corrected_refs, "", formatting_results)
+
+        # ✅ FIX: Convert BytesIO to raw bytes
+        pdf_bytes = pdf_buffer.getvalue()
+
+        # Use raw bytes in download_button
         st.download_button(
             label="📥 Download PDF",
-            data=pdf.getvalue(),               # <-- ✅ CONVERT BytesIO to raw bytes
+            data=pdf_bytes,
             file_name="QAJ_AI_Report.pdf",
             mime="application/pdf"
         )
+
 
 
 
