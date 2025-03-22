@@ -14,6 +14,7 @@ This tool checks:
 - 🔍 Self-Citations
 - 🚫 Qubahan Journal Citations
 - 📚 APA 7th Edition Formatting (Bold Year, No DOI)
+- 👥 Authors Cited ≥ 4 Times
 - 📄 Generate PDF Report
 """)
 
@@ -23,8 +24,8 @@ def extract_author_name(text):
     match = re.search(r"\n(.*?)\n.*?\n", text)
     if match:
         raw_line = match.group(1)
-        clean_line = re.sub(r"[\d\*]+", "", raw_line)  # Remove digits and asterisks
-        clean_line = re.sub(r"\s{2,}", " ", clean_line)  # Fix extra spacing
+        clean_line = re.sub(r"[\d\*]+", "", raw_line)
+        clean_line = re.sub(r"\s{2,}", " ", clean_line)
         clean_line = clean_line.strip(",; \n")
         return clean_line
     return ""
@@ -48,6 +49,17 @@ if uploaded_file:
     st.subheader("📑 Reference Analysis")
     ref_report = check_references(text, author_name)
     st.write(ref_report)
+
+    if "Highly Cited Authors (≥4)" in ref_report:
+        cited = ref_report["Highly Cited Authors (≥4)"]
+        if cited:
+            st.subheader("👥 Authors Cited 4+ Times")
+            for author, refs in cited.items():
+                st.markdown(f"**{author.title()}** — {len(refs)} times")
+                for i, ref in enumerate(refs, start=1):
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{i}. {ref}")
+        else:
+            st.info("No authors cited 4 or more times.")
 
     if st.checkbox("✨ Show corrected references in APA 7 style"):
         references = ref_report.get("Extracted References", [])
