@@ -19,7 +19,6 @@ st.title("🧠 Research Paper Quality & Format Checker")
 
 uploaded_file = st.file_uploader("📤 Upload your research article (PDF or DOCX)", type=["pdf", "docx"])
 
-
 def extract_author_name(text):
     match = re.search(r"\n(.*?)\n.*?\n", text)
     if match:
@@ -29,7 +28,6 @@ def extract_author_name(text):
         clean_line = clean_line.strip(",; \n")
         return clean_line
     return ""
-
 
 def generate_formatting_txt_report(sections):
     report = StringIO()
@@ -44,7 +42,6 @@ def generate_formatting_txt_report(sections):
         report.write("\n")
     report.seek(0)
     return report
-
 
 if uploaded_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name[-5:]) as tmp:
@@ -66,14 +63,26 @@ if uploaded_file:
     if author_name:
         st.markdown(f"**🧑‍💼 Detected Author Name:** `{author_name}`")
 
+    # Reference analysis
     ref_report = check_references(text, author_name)
     references = ref_report.get("Extracted References", [])
 
+    # Formatting checks
     heading_issues = check_headings(text)
     table_issues = check_tables_figures(text)
 
     st.subheader("📑 Reference Analysis Summary")
     st.json(ref_report)
+    
+    # 🔍 Show missing in-text citations
+    if "Missing In-Text Citations" in ref_report:
+        if ref_report["Missing In-Text Citations"]:
+            st.error("❌ Some references are listed but never cited in the text.")
+            st.markdown("**Missing In-Text Citations:**")
+            st.markdown(", ".join([f"[{num}]" for num in ref_report["Missing In-Text Citations"]]))
+        else:
+            st.success("✅ All references in the list are cited in the body.")
+
 
     # Highly cited authors
     if "Highly Cited Authors (≥4)" in ref_report:
@@ -114,7 +123,7 @@ if uploaded_file:
         show_checklist("📘 Heading Structure", heading_issues)
         show_checklist("📊 Table and Figure Captions", table_issues)
 
-        # Fix: Convert StringIO to string
+        # Download .txt formatting report
         formatting_txt = generate_formatting_txt_report([
             ("Font Checks", font_issues),
             ("Paragraph Format", paragraph_issues),
@@ -122,11 +131,9 @@ if uploaded_file:
             ("Heading Structure", heading_issues),
             ("Table and Figure Captions", table_issues)
         ])
-        formatting_txt_str = formatting_txt.getvalue()
-
         st.download_button(
             label="📥 Download Formatting Report (.txt)",
-            data=formatting_txt_str,
+            data=formatting_txt,
             file_name="formatting_report.txt",
             mime="text/plain"
         )
@@ -142,16 +149,22 @@ if uploaded_file:
             "Table and Figure Captions": table_issues
         }
 
+        # Generate PDF report (returns BytesIO)
         pdf_buffer = generate_pdf_report(ref_report, corrected_refs, "", formatting_results)
 
-        # ✅ Fix: Convert BytesIO to bytes
+        # ✅ FIX: Convert BytesIO to raw bytes
         pdf_bytes = pdf_buffer.getvalue()
 
+        # Use raw bytes in download_button
         st.download_button(
             label="📥 Download PDF",
             data=pdf_bytes,
             file_name="QAJ_AI_Report.pdf",
             mime="application/pdf"
         )
+
+
+
+
 else:
     st.info("Upload a PDF or DOCX research article to begin analysis.")
