@@ -10,8 +10,7 @@ def extract_references(text):
     return []
 
 def check_duplicates(refs):
-    duplicates = [item for item, count in Counter(refs).items() if count > 1]
-    return duplicates
+    return [item for item, count in Counter(refs).items() if count > 1]
 
 def check_self_citations(refs, author_name=""):
     if not author_name:
@@ -43,20 +42,42 @@ def check_multiple_mentions(refs):
             if author not in author_refs:
                 author_refs[author] = []
             author_refs[author].append(ref)
-    result = {author: author_refs[author] for author, count in author_counts.items() if count >= 4}
-    return result
+    return {author: author_refs[author] for author, count in author_counts.items() if count >= 4}
+
+def extract_intext_citations(text):
+    matches = re.findall(r"\[(\d+(?:[-–]\d+)?(?:,\s*\d+(?:[-–]\d+)?)*)\]", text)
+    cited = set()
+    for match in matches:
+        parts = re.split(r",\s*", match)
+        for part in parts:
+            if "-" in part or "–" in part:
+                a, b = map(int, re.split(r"[-–]", part))
+                cited.update(range(a, b + 1))
+            else:
+                cited.add(int(part))
+    return sorted(cited)
 
 def check_references(text, author_name=""):
     results = {}
     refs = extract_references(text)
+
     if not refs:
         return {"error": "No references found. Ensure your document contains a 'References' section."}
-    results["Total References"] = len(refs)
+
+    cited_nums = extract_intext_citations(text)
+    total_refs = len(refs)
+    missing_citations = [i for i in range(1, total_refs + 1) if i not in cited_nums]
+
+    results["Total References"] = total_refs
     results["Duplicate References"] = check_duplicates(refs)
     results["Self-Citations"] = check_self_citations(refs, author_name)
     results["Qubahan Citations"] = check_qubahan(refs)
     bold_violations, doi_violations = check_apa_format(refs)
-    results["APA Style Violations"] = {"Missing Bold Year": bold_violations, "Contains DOI": doi_violations}
+    results["APA Style Violations"] = {
+        "Missing Bold Year": bold_violations,
+        "Contains DOI": doi_violations
+    }
     results["Highly Cited Authors (≥4)"] = check_multiple_mentions(refs)
+    results["Missing In-Text Citations"] = missing_citations
     results["Extracted References"] = refs
     return results
