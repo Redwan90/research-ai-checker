@@ -1,6 +1,7 @@
 import streamlit as st
 import tempfile
 import re
+from io import StringIO
 from file_parser import extract_text_from_pdf, extract_text_from_docx
 from ref_checker import check_references
 from citation_formatter import correct_references
@@ -11,8 +12,9 @@ from format_checker import (
     check_margins,
     check_headings,
     check_tables_figures,
+    check_subheadings,          # ✅ NEW
+    check_bullet_points         # ✅ NEW
 )
-from io import StringIO
 
 st.set_page_config(page_title="Research AI Checker", layout="wide")
 st.title("🧠 Research Paper Quality & Format Checker")
@@ -40,22 +42,23 @@ def generate_formatting_txt_report(sections):
         else:
             report.write("✅ All OK\n")
         report.write("\n")
-    return report.getvalue()  # ✅ return as plain string
+    return report.getvalue()
 
 if uploaded_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name[-5:]) as tmp:
         tmp.write(uploaded_file.read())
         file_path = tmp.name
 
-    # Extract paper content
     if uploaded_file.name.endswith(".pdf"):
         text = extract_text_from_pdf(open(file_path, "rb"))
-        font_issues, paragraph_issues, margin_issues = [], [], []
+        font_issues = paragraph_issues = margin_issues = subheading_issues = bullet_issues = []
     else:
         text = extract_text_from_docx(open(file_path, "rb"))
         font_issues = check_font_and_spacing(file_path)
         paragraph_issues = check_paragraph_format(file_path)
         margin_issues = check_margins(file_path)
+        subheading_issues = check_subheadings(file_path)         # ✅ NEW
+        bullet_issues = check_bullet_points(file_path)           # ✅ NEW
 
     author_name = extract_author_name(text)
     if author_name:
@@ -70,7 +73,6 @@ if uploaded_file:
     st.subheader("📑 Reference Analysis Summary")
     st.json(ref_report)
 
-    # 🔍 Missing in-text citations
     if "Missing In-Text Citations" in ref_report:
         if ref_report["Missing In-Text Citations"]:
             st.error("❌ Some references are listed but never cited in the text.")
@@ -79,7 +81,6 @@ if uploaded_file:
         else:
             st.success("✅ All references in the list are cited in the body.")
 
-    # Optional: Highly Cited Authors (≥4)
     if "Highly Cited Authors (≥4)" in ref_report:
         cited = ref_report["Highly Cited Authors (≥4)"]
         if cited:
@@ -94,13 +95,11 @@ if uploaded_file:
                             st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{idx}. {ref}")
                         shown.add(ref)
 
-    # 🔧 APA 7 corrected references
     if st.checkbox("✨ Show corrected references in APA 7 style"):
         corrected_refs = correct_references(references)
         for i, ref in enumerate(corrected_refs, start=1):
             st.markdown(f"{i}. {ref}")
 
-    # ✅ Formatting checklist
     st.subheader("🧾 Formatting & Style Check")
 
     def show_checklist(title, issues):
@@ -117,14 +116,17 @@ if uploaded_file:
         show_checklist("🧱 Margin Checks", margin_issues)
         show_checklist("📘 Heading Structure", heading_issues)
         show_checklist("📊 Table and Figure Captions", table_issues)
+        show_checklist("🔢 Subheading & Sub-subheading Checks", subheading_issues)   # ✅
+        show_checklist("• Bullet Point Style Checks", bullet_issues)                 # ✅
 
-        # 📥 Download .txt report
         formatting_txt = generate_formatting_txt_report([
             ("Font Checks", font_issues),
             ("Paragraph Format", paragraph_issues),
             ("Margin Checks", margin_issues),
             ("Heading Structure", heading_issues),
-            ("Table and Figure Captions", table_issues)
+            ("Table and Figure Captions", table_issues),
+            ("Subheading Checks", subheading_issues),
+            ("Bullet Point Checks", bullet_issues)
         ])
         st.download_button(
             label="📥 Download Formatting Report (.txt)",
@@ -133,7 +135,6 @@ if uploaded_file:
             mime="text/plain"
         )
 
-    # 📄 PDF report generation
     if st.button("📄 Download Full Report as PDF"):
         corrected_refs = correct_references(references)
         formatting_results = {
@@ -141,14 +142,17 @@ if uploaded_file:
             "Paragraph Format": paragraph_issues,
             "Margin Checks": margin_issues,
             "Heading Structure": heading_issues,
-            "Table and Figure Captions": table_issues
+            "Table and Figure Captions": table_issues,
+            "Subheading Checks": subheading_issues,
+            "Bullet Point Checks": bullet_issues
         }
         pdf_buffer = generate_pdf_report(ref_report, corrected_refs, "", formatting_results)
         st.download_button(
             label="📥 Download PDF",
-            data=pdf_buffer.getvalue(),  # ✅ return raw bytes
+            data=pdf_buffer.getvalue(),
             file_name="QAJ_AI_Report.pdf",
             mime="application/pdf"
         )
+
 else:
     st.info("Upload a PDF or DOCX research article to begin analysis.")
