@@ -12,8 +12,9 @@ from format_checker import (
     check_margins,
     check_headings,
     check_tables_figures,
-    check_subheadings,          # ✅ NEW
-    check_bullet_points         # ✅ NEW
+    check_subheadings,
+    check_bullet_points,
+    check_reference_formatting  # ✅ NEW
 )
 
 st.set_page_config(page_title="Research AI Checker", layout="wide")
@@ -51,14 +52,15 @@ if uploaded_file:
 
     if uploaded_file.name.endswith(".pdf"):
         text = extract_text_from_pdf(open(file_path, "rb"))
-        font_issues = paragraph_issues = margin_issues = subheading_issues = bullet_issues = []
+        font_issues = paragraph_issues = margin_issues = subheading_issues = bullet_issues = ref_format_issues = []
     else:
         text = extract_text_from_docx(open(file_path, "rb"))
         font_issues = check_font_and_spacing(file_path)
         paragraph_issues = check_paragraph_format(file_path)
         margin_issues = check_margins(file_path)
-        subheading_issues = check_subheadings(file_path)         # ✅ NEW
-        bullet_issues = check_bullet_points(file_path)           # ✅ NEW
+        subheading_issues = check_subheadings(file_path)
+        bullet_issues = check_bullet_points(file_path)
+        ref_format_issues = check_reference_formatting(file_path)  # ✅ NEW
 
     author_name = extract_author_name(text)
     if author_name:
@@ -116,8 +118,9 @@ if uploaded_file:
         show_checklist("🧱 Margin Checks", margin_issues)
         show_checklist("📘 Heading Structure", heading_issues)
         show_checklist("📊 Table and Figure Captions", table_issues)
-        show_checklist("🔢 Subheading & Sub-subheading Checks", subheading_issues)   # ✅
-        show_checklist("• Bullet Point Style Checks", bullet_issues)                 # ✅
+        show_checklist("🔢 Subheading & Sub-subheading Checks", subheading_issues)
+        show_checklist("• Bullet Point Style Checks", bullet_issues)
+        show_checklist("📚 References Style Checks", ref_format_issues)  # ✅ NEW
 
         formatting_txt = generate_formatting_txt_report([
             ("Font Checks", font_issues),
@@ -126,7 +129,8 @@ if uploaded_file:
             ("Heading Structure", heading_issues),
             ("Table and Figure Captions", table_issues),
             ("Subheading Checks", subheading_issues),
-            ("Bullet Point Checks", bullet_issues)
+            ("Bullet Point Checks", bullet_issues),
+            ("References Style Checks", ref_format_issues)
         ])
         st.download_button(
             label="📥 Download Formatting Report (.txt)",
@@ -144,7 +148,8 @@ if uploaded_file:
             "Heading Structure": heading_issues,
             "Table and Figure Captions": table_issues,
             "Subheading Checks": subheading_issues,
-            "Bullet Point Checks": bullet_issues
+            "Bullet Point Checks": bullet_issues,
+            "References Style Checks": ref_format_issues
         }
         pdf_buffer = generate_pdf_report(ref_report, corrected_refs, "", formatting_results)
         st.download_button(
