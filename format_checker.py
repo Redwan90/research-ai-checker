@@ -43,7 +43,7 @@ def check_paragraph_format(file_path):
     return issues
 
 def check_margins(file_path):
-    # Placeholder: python-docx cannot check margins directly
+    # python-docx cannot read margins; simulate check
     return ["Top margin is not 1 inch."]
 
 def check_headings(text):
@@ -99,4 +99,52 @@ def check_bullet_points(file_path):
                 issues.append(f"Bullet indent not 0.19 inch: '{info['text'][:50]}'")
             if para.alignment != 3:
                 issues.append(f"Bullet point not justified: '{info['text'][:50]}'")
+    return issues
+
+def check_reference_formatting(file_path):
+    doc = Document(file_path)
+    issues = []
+    found_references = False
+    checking_refs = False
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+
+        if text == "References":
+            found_references = True
+            info = get_paragraph_info(para)
+
+            if info["font_size"] != 10:
+                issues.append("❌ 'References' heading should be 10 pt.")
+            if info["color"] not in ["0000FF", "0000ff"]:
+                issues.append("❌ 'References' heading should be blue (hex #0000FF).")
+            if abs(info["spacing_before"] - 17) > 1:
+                issues.append("❌ 'References' heading should have 17 pt spacing before.")
+            if str(info["line_spacing"]).lower() != "single":
+                issues.append("❌ 'References' heading should have single line spacing.")
+
+            checking_refs = True
+            continue
+
+        if checking_refs:
+            if not text:
+                continue
+            info = get_paragraph_info(para)
+
+            if info["font_size"] != 8:
+                issues.append(f"❌ Font size should be 8 pt in: '{text[:50]}'")
+            if not info["font_name"] or "palatino" not in info["font_name"].lower():
+                issues.append(f"❌ Font should be Palatino Linotype in: '{text[:50]}'")
+            if info["alignment"] != 3:
+                issues.append(f"❌ Reference not justified: '{text[:50]}'")
+            if not info["left_indent"] or abs(info["left_indent"].inches - 0.25) > 0.05:
+                issues.append(f"❌ Hanging indent should be 0.25 inch in: '{text[:50]}'")
+            if info["spacing_before"] > 1 or info["spacing_after"] > 1:
+                issues.append(f"❌ Spacing before/after text should be 0 in: '{text[:50]}'")
+            if str(info["line_spacing"]).lower() != "single":
+                issues.append(f"❌ Line spacing should be single in: '{text[:50]}'")
+
+    if not found_references:
+        issues.append("❌ 'References' heading not found in the document.")
+
     return issues
