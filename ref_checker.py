@@ -35,32 +35,21 @@ def check_multiple_mentions(refs):
     author_refs = defaultdict(list)
 
     for ref in refs:
-        # Remove citation number at start like [1]
         ref_clean = re.sub(r"^\[\d+\]\s*", "", ref)
 
-        # Extract author block before the year
-        match = re.search(r"(.+?)\(\d{4}\)", ref_clean)
-        author_block = match.group(1) if match else ref_clean.split(".")[0]
+        # Match initials with surname: e.g., M. Karimi, A. Smith
+        candidates = re.findall(r"\b[A-Z]\.\s*[A-Z][a-z]+", ref_clean)
 
-        # Remove et al., and unwanted symbols
-        author_block = re.sub(r"\bet al\.?", "", author_block, flags=re.IGNORECASE)
-        author_block = re.sub(r"[^A-Za-z.,\- ]+", "", author_block)
-        author_block = re.sub(r"\s{2,}", " ", author_block).strip()
+        for name in candidates:
+            norm_name = re.sub(r"\s+", " ", name).strip().lower()
+            author_counts[norm_name] += 1
+            author_refs[norm_name].append(ref)
 
-        # Split by common delimiters
-        authors = re.split(r",| and | & ", author_block)
-
-        for author in authors:
-            author = author.strip()
-            if not author or len(author) < 3:
-                continue
-            if re.fullmatch(r"\d{4}", author) or author.isdigit():
-                continue
-            key = author.lower()
-            author_counts[key] += 1
-            author_refs[key].append(ref)
-
-    return {author: author_refs[author] for author, count in author_counts.items() if count >= 4}
+    return {
+        author: list(set(author_refs[author]))
+        for author, count in author_counts.items()
+        if count >= 4
+    }
 
 def check_missing_citations(text, refs):
     missing = []
