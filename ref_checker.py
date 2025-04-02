@@ -35,22 +35,20 @@ def check_multiple_mentions(refs):
     author_refs = defaultdict(list)
 
     for ref in refs:
-        # Remove [1], [2] at beginning
+        # Remove citation number at start like [1]
         ref_clean = re.sub(r"^\[\d+\]\s*", "", ref)
 
-        # Get text before (2023), (2022), etc.
+        # Extract author block before the year
         match = re.search(r"(.+?)\(\d{4}\)", ref_clean)
-        author_part = match.group(1) if match else ref_clean.split(".")[0]
+        author_block = match.group(1) if match else ref_clean.split(".")[0]
 
-        # Remove "et al."
-        author_part = re.sub(r"\bet al\.?", "", author_part, flags=re.IGNORECASE)
+        # Remove et al., and unwanted symbols
+        author_block = re.sub(r"\bet al\.?", "", author_block, flags=re.IGNORECASE)
+        author_block = re.sub(r"[^A-Za-z.,\- ]+", "", author_block)
+        author_block = re.sub(r"\s{2,}", " ", author_block).strip()
 
-        # Remove extra symbols and normalize spacing
-        author_part = re.sub(r"[^A-Za-z.,\- ]+", "", author_part)
-        author_part = re.sub(r"\s{2,}", " ", author_part).strip()
-
-        # Split by comma, ampersand, and 'and'
-        authors = re.split(r",| and | & ", author_part)
+        # Split by common delimiters
+        authors = re.split(r",| and | & ", author_block)
 
         for author in authors:
             author = author.strip()
