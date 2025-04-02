@@ -35,30 +35,34 @@ def check_multiple_mentions(refs):
     author_refs = defaultdict(list)
 
     for ref in refs:
-        # Remove citation number at the beginning [12]
+        # Remove [1], [2] at beginning
         ref_clean = re.sub(r"^\[\d+\]\s*", "", ref)
 
-        # Extract authors from beginning until year
-        match = re.match(r"(.+?)\(\d{4}\)", ref_clean)
-        if match:
-            author_part = match.group(1)
-        else:
-            author_part = ref_clean.split(".")[0]  # fallback
+        # Get text before (2023), (2022), etc.
+        match = re.search(r"(.+?)\(\d{4}\)", ref_clean)
+        author_part = match.group(1) if match else ref_clean.split(".")[0]
 
-        # Split on commas or "and" or ampersand
-        authors = re.split(r",| and |&", author_part)
+        # Remove "et al."
+        author_part = re.sub(r"\bet al\.?", "", author_part, flags=re.IGNORECASE)
+
+        # Remove extra symbols and normalize spacing
+        author_part = re.sub(r"[^A-Za-z.,\- ]+", "", author_part)
+        author_part = re.sub(r"\s{2,}", " ", author_part).strip()
+
+        # Split by comma, ampersand, and 'and'
+        authors = re.split(r",| and | & ", author_part)
+
         for author in authors:
             author = author.strip()
-            if not author or re.fullmatch(r"\d{4}", author) or author.isdigit():
+            if not author or len(author) < 3:
                 continue
-            if len(author) < 3:
+            if re.fullmatch(r"\d{4}", author) or author.isdigit():
                 continue
             key = author.lower()
             author_counts[key] += 1
             author_refs[key].append(ref)
 
-    result = {auth: author_refs[auth] for auth, count in author_counts.items() if count >= 4}
-    return result
+    return {author: author_refs[author] for author, count in author_counts.items() if count >= 4}
 
 def check_missing_citations(text, refs):
     missing = []
