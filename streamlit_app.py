@@ -2,6 +2,7 @@ import streamlit as st
 import tempfile
 import re
 from io import StringIO
+from docx import Document
 from file_parser import extract_text_from_pdf, extract_text_from_docx
 from ref_checker import check_references
 from citation_formatter import correct_references
@@ -14,7 +15,7 @@ from format_checker import (
     check_tables_figures,
     check_subheadings,
     check_bullet_points,
-    check_reference_formatting  # ✅ NEW
+    check_reference_formatting
 )
 
 st.set_page_config(page_title="Research AI Checker", layout="wide")
@@ -22,6 +23,34 @@ st.title("🧠 Research Paper Quality & Format Checker")
 
 uploaded_file = st.file_uploader("📤 Upload your research article (PDF or DOCX)", type=["pdf", "docx"])
 
+
+# ✅ Improved Author Extraction for DOCX
+def extract_author_name_docx(file_path):
+    doc = Document(file_path)
+    title_found = False
+    author_candidate = ""
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            continue
+
+        if not title_found and len(text.split()) > 6:
+            title_found = True
+            continue
+
+        if ',' in text and len(text.split()) < 25 and not any(
+            kw in text.lower() for kw in ['university', 'department', 'abstract', 'received']
+        ):
+            author_candidate = text
+            break
+
+    clean_authors = re.sub(r"[\d\*\†\‡]", "", author_candidate)
+    clean_authors = re.sub(r"\s{2,}", " ", clean_authors).strip()
+    return clean_authors if clean_authors else "Unknown"
+
+
+# Fallback for PDF
 def extract_author_name(text):
     match = re.search(r"\n(.*?)\n.*?\n", text)
     if match:
@@ -31,6 +60,7 @@ def extract_author_name(text):
         clean_line = clean_line.strip(",; \n")
         return clean_line
     return ""
+
 
 def generate_formatting_txt_report(sections):
     report = StringIO()
@@ -45,6 +75,7 @@ def generate_formatting_txt_report(sections):
         report.write("\n")
     return report.getvalue()
 
+
 if uploaded_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name[-5:]) as tmp:
         tmp.write(uploaded_file.read())
@@ -52,17 +83,18 @@ if uploaded_file:
 
     if uploaded_file.name.endswith(".pdf"):
         text = extract_text_from_pdf(open(file_path, "rb"))
+        author_name = extract_author_name(text)
         font_issues = paragraph_issues = margin_issues = subheading_issues = bullet_issues = ref_format_issues = []
     else:
         text = extract_text_from_docx(open(file_path, "rb"))
+        author_name = extract_author_name_docx(file_path)
         font_issues = check_font_and_spacing(file_path)
         paragraph_issues = check_paragraph_format(file_path)
         margin_issues = check_margins(file_path)
         subheading_issues = check_subheadings(file_path)
         bullet_issues = check_bullet_points(file_path)
-        ref_format_issues = check_reference_formatting(file_path)  # ✅ NEW
+        ref_format_issues = check_reference_formatting(file_path)
 
-    author_name = extract_author_name(text)
     if author_name:
         st.markdown(f"**🧑‍💼 Detected Author Name:** `{author_name}`")
 
@@ -120,7 +152,7 @@ if uploaded_file:
         show_checklist("📊 Table and Figure Captions", table_issues)
         show_checklist("🔢 Subheading & Sub-subheading Checks", subheading_issues)
         show_checklist("• Bullet Point Style Checks", bullet_issues)
-        show_checklist("📚 References Style Checks", ref_format_issues)  # ✅ NEW
+        show_checklist("📚 References Style Checks", ref_format_issues)
 
         formatting_txt = generate_formatting_txt_report([
             ("Font Checks", font_issues),
