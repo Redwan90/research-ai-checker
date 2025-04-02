@@ -1,5 +1,5 @@
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 
 def extract_references(text):
     match = re.search(r"(References|REFERENCES)[\s\n]+(.+)", text, re.DOTALL)
@@ -32,43 +32,48 @@ def check_apa_format(refs):
 
 def check_multiple_mentions(refs):
     author_counts = Counter()
-    author_refs = {}
-    for ref in refs:
-        authors_part = ref.split("(")[0]
-        authors = re.split(r",| and |&", authors_part)
-        authors = [a.strip().lower() for a in authors if len(a.strip()) > 3]
-        for author in authors:
-            author_counts[author] += 1
-            if author not in author_refs:
-                author_refs[author] = []
-            author_refs[author].append(ref)
-    return {author: author_refs[author] for author, count in author_counts.items() if count >= 4}
+    author_refs = defaultdict(list)
 
-def extract_intext_citations(text):
-    matches = re.findall(r"\[(\d+(?:[-–]\d+)?(?:,\s*\d+(?:[-–]\d+)?)*)\]", text)
-    cited = set()
-    for match in matches:
-        parts = re.split(r",\s*", match)
-        for part in parts:
-            if "-" in part or "–" in part:
-                a, b = map(int, re.split(r"[-–]", part))
-                cited.update(range(a, b + 1))
-            else:
-                cited.add(int(part))
-    return sorted(cited)
+    for ref in refs:
+        # Remove citation number at the beginning [12]
+        ref_clean = re.sub(r"^\[\d+\]\s*", "", ref)
+
+        # Extract authors from beginning until year
+        match = re.match(r"(.+?)\(\d{4}\)", ref_clean)
+        if match:
+            author_part = match.group(1)
+        else:
+            author_part = ref_clean.split(".")[0]  # fallback
+
+        # Split on commas or "and" or ampersand
+        authors = re.split(r",| and |&", author_part)
+        for author in authors:
+            author = author.strip()
+            if not author or re.fullmatch(r"\d{4}", author) or author.isdigit():
+                continue
+            if len(author) < 3:
+                continue
+            key = author.lower()
+            author_counts[key] += 1
+            author_refs[key].append(ref)
+
+    result = {auth: author_refs[auth] for auth, count in author_counts.items() if count >= 4}
+    return result
+
+def check_missing_citations(text, refs):
+    missing = []
+    for i, ref in enumerate(refs):
+        if f"[{i+1}]" not in text:
+            missing.append(i + 1)
+    return missing
 
 def check_references(text, author_name=""):
     results = {}
     refs = extract_references(text)
-
     if not refs:
         return {"error": "No references found. Ensure your document contains a 'References' section."}
 
-    cited_nums = extract_intext_citations(text)
-    total_refs = len(refs)
-    missing_citations = [i for i in range(1, total_refs + 1) if i not in cited_nums]
-
-    results["Total References"] = total_refs
+    results["Total References"] = len(refs)
     results["Duplicate References"] = check_duplicates(refs)
     results["Self-Citations"] = check_self_citations(refs, author_name)
     results["Qubahan Citations"] = check_qubahan(refs)
@@ -78,6 +83,6 @@ def check_references(text, author_name=""):
         "Contains DOI": doi_violations
     }
     results["Highly Cited Authors (≥4)"] = check_multiple_mentions(refs)
-    results["Missing In-Text Citations"] = missing_citations
+    results["Missing In-Text Citations"] = check_missing_citations(text, refs)
     results["Extracted References"] = refs
     return results
