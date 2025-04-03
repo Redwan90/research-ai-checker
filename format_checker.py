@@ -1,5 +1,4 @@
 from docx import Document
-from docx.shared import Pt
 import re
 
 def get_paragraph_info(para):
@@ -43,8 +42,7 @@ def check_paragraph_format(file_path):
     return issues
 
 def check_margins(file_path):
-    # python-docx cannot read margins; simulate check
-    return ["Top margin is not 1 inch."]
+    return ["Top margin is not 1 inch."]  # Placeholder (python-docx doesn't access margin info)
 
 def check_headings(text):
     required = ["ABSTRACT", "INTRODUCTION", "LITERATURE REVIEW", "METHOD", "RESULT", "DISCUSSION", "CONCLUSION", "REFERENCES"]
@@ -54,19 +52,25 @@ def check_headings(text):
 
 def check_tables_figures(text):
     issues = []
-    tables = re.findall(r"(Table\s*\d+[\.:])", text, re.IGNORECASE)
-    table_refs = re.findall(r"see Table\s*\d+", text, re.IGNORECASE)
-    for table in tables:
-        num = re.search(r"\d+", table)
-        if num and not any(num.group() in ref for ref in table_refs):
-            issues.append(f"{table.strip()} not referenced in text.")
+    normalized_text = text.lower()
 
-    figures = re.findall(r"(FIGURE\s*\d+[\.:])", text, re.IGNORECASE)
-    figure_refs = re.findall(r"see FIGURE\s*\d+", text, re.IGNORECASE)
-    for fig in figures:
-        num = re.search(r"\d+", fig)
-        if num and not any(num.group() in ref for ref in figure_refs):
-            issues.append(f"{fig.strip()} not referenced in text.")
+    table_matches = re.findall(r'\btable\s+(\d+)[\.:]', text, re.IGNORECASE)
+    figure_matches = re.findall(r'\bfigure\s+(\d+)[\.:]', text, re.IGNORECASE)
+
+    table_references = re.findall(r'\b(table|Table|TABLE)\s+(\d+)', text)
+    figure_references = re.findall(r'\b(figure|Figure|FIGURE)\s+(\d+)', text)
+
+    referenced_tables = {num for _, num in table_references}
+    referenced_figures = {num for _, num in figure_references}
+
+    for num in set(table_matches):
+        if num not in referenced_tables:
+            issues.append(f"Table {num} not referenced in text.")
+
+    for num in set(figure_matches):
+        if num not in referenced_figures:
+            issues.append(f"Figure {num} not referenced in text.")
+
     return issues
 
 def check_subheadings(file_path):
@@ -122,7 +126,6 @@ def check_reference_formatting(file_path):
                 issues.append("❌ 'References' heading should have 17 pt spacing before.")
             if str(info["line_spacing"]).lower() != "single":
                 issues.append("❌ 'References' heading should have single line spacing.")
-
             checking_refs = True
             continue
 
@@ -130,7 +133,6 @@ def check_reference_formatting(file_path):
             if not text:
                 continue
             info = get_paragraph_info(para)
-
             if info["font_size"] != 8:
                 issues.append(f"❌ Font size should be 8 pt in: '{text[:50]}'")
             if not info["font_name"] or "palatino" not in info["font_name"].lower():
