@@ -1,5 +1,7 @@
 from docx import Document
+from docx.shared import Pt
 import re
+import string
 
 def get_paragraph_info(para):
     run = para.runs[0] if para.runs else None
@@ -19,15 +21,21 @@ def get_paragraph_info(para):
         "font_name": run.font.name if run and run.font.name else None,
     }
 
+def clean_text(text):
+    return text.strip() if text and text.strip() and any(c.isalnum() for c in text) else ""
+
 def check_font_and_spacing(file_path):
     doc = Document(file_path)
     issues = []
     for para in doc.paragraphs:
         info = get_paragraph_info(para)
+        text = clean_text(info["text"])
+        if not text:
+            continue
         if not info["font_name"] or "palatino" not in info["font_name"].lower():
-            issues.append(f"Font not Palatino Linotype in: '{info['text'][:50]}'")
-        if info["font_size"] and info["font_size"] != 12 and info["text"]:
-            issues.append(f"Font size is {info['font_size']} pt instead of 12 pt: '{info['text'][:50]}'")
+            issues.append(f"Font not Palatino Linotype in: '{text[:80]}'")
+        if info["font_size"] and info["font_size"] != 12:
+            issues.append(f"Font size is {info['font_size']} pt instead of 12 pt: '{text[:80]}'")
     return issues
 
 def check_paragraph_format(file_path):
@@ -35,14 +43,17 @@ def check_paragraph_format(file_path):
     issues = []
     for para in doc.paragraphs:
         info = get_paragraph_info(para)
-        if para.text and para.alignment != 3:  # Justified = 3
-            issues.append(f"Paragraph not justified: '{info['text'][:50]}'")
+        text = clean_text(info["text"])
+        if not text:
+            continue
+        if para.alignment != 3:  # Justified
+            issues.append(f"Paragraph not justified: '{text[:80]}'")
         if not info["first_line_indent"] or abs(info["first_line_indent"].inches - 0.2) > 0.05:
-            issues.append(f"Paragraph missing first-line indent (should be 0.2\"): '{info['text'][:50]}'")
+            issues.append(f"Paragraph missing first-line indent (should be 0.2\"): '{text[:80]}'")
     return issues
 
 def check_margins(file_path):
-    return ["Top margin is not 1 inch."]  # Placeholder (python-docx doesn't access margin info)
+    return ["Top margin is not 1 inch."]  # Placeholder; python-docx cannot detect margins
 
 def check_headings(text):
     required = ["ABSTRACT", "INTRODUCTION", "LITERATURE REVIEW", "METHOD", "RESULT", "DISCUSSION", "CONCLUSION", "REFERENCES"]
@@ -52,25 +63,23 @@ def check_headings(text):
 
 def check_tables_figures(text):
     issues = []
-    normalized_text = text.lower()
+    table_titles = re.findall(r"(Table\s+\d+)[\.:]?", text, re.IGNORECASE)
+    table_refs = re.findall(r"(Table\s+\d+)", text, re.IGNORECASE)
 
-    table_matches = re.findall(r'\btable\s+(\d+)[\.:]', text, re.IGNORECASE)
-    figure_matches = re.findall(r'\bfigure\s+(\d+)[\.:]', text, re.IGNORECASE)
+    figure_titles = re.findall(r"(FIGURE\s+\d+)[\.:]?", text, re.IGNORECASE)
+    figure_refs = re.findall(r"(FIGURE\s+\d+)", text, re.IGNORECASE)
 
-    table_references = re.findall(r'\b(table|Table|TABLE)\s+(\d+)', text)
-    figure_references = re.findall(r'\b(figure|Figure|FIGURE)\s+(\d+)', text)
+    table_title_set = set([t.lower() for t in table_titles])
+    table_ref_set = set([r.lower() for r in table_refs])
+    for t in table_title_set:
+        if t not in table_ref_set:
+            issues.append(f"{t.title()} not referenced in text.")
 
-    referenced_tables = {num for _, num in table_references}
-    referenced_figures = {num for _, num in figure_references}
-
-    for num in set(table_matches):
-        if num not in referenced_tables:
-            issues.append(f"Table {num} not referenced in text.")
-
-    for num in set(figure_matches):
-        if num not in referenced_figures:
-            issues.append(f"Figure {num} not referenced in text.")
-
+    figure_title_set = set([f.lower() for f in figure_titles])
+    figure_ref_set = set([f.lower() for f in figure_refs])
+    for f in figure_title_set:
+        if f not in figure_ref_set:
+            issues.append(f"{f.upper()} not referenced in text.")
     return issues
 
 def check_subheadings(file_path):
@@ -78,13 +87,15 @@ def check_subheadings(file_path):
     issues = []
     for para in doc.paragraphs:
         info = get_paragraph_info(para)
-        text = info['text']
-        if re.match(r"\d+\.\s+[A-Z ]+$", text):  # e.g., 1. EXAMPLE
+        text = clean_text(info['text'])
+        if not text:
+            continue
+        if re.match(r"\d+\.\s+[A-Z ]+$", text):
             if not info["italic"]:
                 issues.append(f"Subheading not italic: '{text}'")
             if info["spacing_before"] < 10:
                 issues.append(f"Subheading spacing before should be 12 pt: '{text}'")
-        elif re.match(r"\d+\.\d+\s+[A-Z][a-z]+", text):  # e.g., 1.1 Example
+        elif re.match(r"\d+\.\d+\s+[A-Z][a-z]+", text):
             if not info["italic"]:
                 issues.append(f"Sub-subheading not italic: '{text}'")
             if info["spacing_before"] < 5:
@@ -95,14 +106,17 @@ def check_bullet_points(file_path):
     doc = Document(file_path)
     issues = []
     for para in doc.paragraphs:
+        text = clean_text(para.text)
+        if not text:
+            continue
         if para.style.name.lower().startswith("list"):
             info = get_paragraph_info(para)
             if info["font_size"] != 10:
-                issues.append(f"Bullet point font size not 10 pt: '{info['text'][:50]}'")
+                issues.append(f"Bullet point font size not 10 pt: '{text[:80]}'")
             if not info["left_indent"] or abs(info["left_indent"].inches - 0.19) > 0.05:
-                issues.append(f"Bullet indent not 0.19 inch: '{info['text'][:50]}'")
+                issues.append(f"Bullet indent not 0.19 inch: '{text[:80]}'")
             if para.alignment != 3:
-                issues.append(f"Bullet point not justified: '{info['text'][:50]}'")
+                issues.append(f"Bullet point not justified: '{text[:80]}'")
     return issues
 
 def check_reference_formatting(file_path):
@@ -112,12 +126,13 @@ def check_reference_formatting(file_path):
     checking_refs = False
 
     for para in doc.paragraphs:
-        text = para.text.strip()
+        text = clean_text(para.text)
+        if not text:
+            continue
 
         if text == "References":
             found_references = True
             info = get_paragraph_info(para)
-
             if info["font_size"] != 10:
                 issues.append("❌ 'References' heading should be 10 pt.")
             if info["color"] not in ["0000FF", "0000ff"]:
@@ -130,21 +145,19 @@ def check_reference_formatting(file_path):
             continue
 
         if checking_refs:
-            if not text:
-                continue
             info = get_paragraph_info(para)
             if info["font_size"] != 8:
-                issues.append(f"❌ Font size should be 8 pt in: '{text[:50]}'")
+                issues.append(f"❌ Font size should be 8 pt in: '{text[:80]}'")
             if not info["font_name"] or "palatino" not in info["font_name"].lower():
-                issues.append(f"❌ Font should be Palatino Linotype in: '{text[:50]}'")
+                issues.append(f"❌ Font should be Palatino Linotype in: '{text[:80]}'")
             if info["alignment"] != 3:
-                issues.append(f"❌ Reference not justified: '{text[:50]}'")
+                issues.append(f"❌ Reference not justified: '{text[:80]}'")
             if not info["left_indent"] or abs(info["left_indent"].inches - 0.25) > 0.05:
-                issues.append(f"❌ Hanging indent should be 0.25 inch in: '{text[:50]}'")
+                issues.append(f"❌ Hanging indent should be 0.25 inch in: '{text[:80]}'")
             if info["spacing_before"] > 1 or info["spacing_after"] > 1:
-                issues.append(f"❌ Spacing before/after text should be 0 in: '{text[:50]}'")
+                issues.append(f"❌ Spacing before/after text should be 0 in: '{text[:80]}'")
             if str(info["line_spacing"]).lower() != "single":
-                issues.append(f"❌ Line spacing should be single in: '{text[:50]}'")
+                issues.append(f"❌ Line spacing should be single in: '{text[:80]}'")
 
     if not found_references:
         issues.append("❌ 'References' heading not found in the document.")
