@@ -23,12 +23,13 @@ st.title("🧠 Research Paper Quality & Format Checker")
 uploaded_file = st.file_uploader("📤 Upload your research article (PDF or DOCX)", type=["pdf", "docx"])
 
 def extract_author_name(text):
-    lines = text.split("\n")
-    for i in range(min(10, len(lines))):
-        line = lines[i].strip()
-        if line and len(line.split()) > 1 and not any(c in line for c in ":.()"):
-            clean_line = re.sub(r"[\d\*]+", "", line)
-            return clean_line.strip(",; ")
+    match = re.search(r"\n(.*?)\n.*?\n", text)
+    if match:
+        raw_line = match.group(1)
+        clean_line = re.sub(r"[\d\*]+", "", raw_line)
+        clean_line = re.sub(r"\s{2,}", " ", clean_line)
+        clean_line = clean_line.strip(",; \n")
+        return clean_line
     return ""
 
 def generate_formatting_txt_report(sections):
@@ -93,7 +94,7 @@ if uploaded_file:
                     if ref not in shown:
                         indices = [i + 1 for i, r in enumerate(references) if r == ref]
                         for idx in indices:
-                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;[{idx}]. {ref}")
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{idx}. {ref}")
                         shown.add(ref)
 
     if st.checkbox("✨ Show corrected references in APA 7 style"):
@@ -103,15 +104,15 @@ if uploaded_file:
 
     st.subheader("🧾 Formatting & Style Check")
 
-    def show_checklist(title, issues):
-        st.markdown(f"**{title}**")
-        if issues:
-            for issue in issues:
-                st.markdown(f"❌ {issue}")
-        else:
-            st.markdown("✅ All OK")
-
     with st.expander("🔍 Formatting Validation Results", expanded=True):
+        def show_checklist(icon_title, issues):
+            st.markdown(f"**{icon_title}**")
+            if issues:
+                for issue in issues:
+                    st.markdown(f"❌ {issue}")
+            else:
+                st.markdown("✅ All OK")
+
         show_checklist("🔤 Font Checks", font_issues)
         show_checklist("📐 Paragraph Format", paragraph_issues)
         show_checklist("🧱 Margin Checks", margin_issues)
