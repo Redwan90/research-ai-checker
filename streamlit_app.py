@@ -22,7 +22,6 @@ st.title("🧠 Research Paper Quality & Format Checker")
 
 uploaded_file = st.file_uploader("📤 Upload your research article (PDF or DOCX)", type=["pdf", "docx"])
 
-
 def extract_author_name(text):
     match = re.search(r"\n(.*?)\n.*?\n", text)
     if match:
@@ -33,7 +32,6 @@ def extract_author_name(text):
         return clean_line
     return ""
 
-
 def generate_formatting_txt_report(sections):
     report = StringIO()
     report.write("🔍 Formatting Validation Report\n\n")
@@ -41,27 +39,19 @@ def generate_formatting_txt_report(sections):
         report.write(f"=== {title} ===\n")
         if issues:
             for issue in issues:
-                clean_text = issue.replace("''", "").strip()
-                if clean_text:
-                    report.write(f"❌ {clean_text}\n")
+                report.write(f"❌ {issue}\n")
         else:
             report.write("✅ All OK\n")
         report.write("\n")
     return report.getvalue()
 
-
 def show_checklist(title, issues):
-    with st.expander(f"🔹 {title}", expanded=True):
-        if not issues:
-            st.markdown("✅ **All OK**")
-        else:
-            for issue in issues:
-                clean_text = issue.replace("''", "").strip()
-                if clean_text:
-                    st.markdown(f"❌ {clean_text}")
-                else:
-                    st.markdown("❌ Formatting issue found (empty text or unknown style)")
-
+    st.markdown(f"### {title}")
+    if issues:
+        for issue in issues:
+            st.markdown(f"❌ {issue}")
+    else:
+        st.markdown("✅ All OK")
 
 if uploaded_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name[-5:]) as tmp:
@@ -86,6 +76,7 @@ if uploaded_file:
 
     ref_report = check_references(text, author_name)
     references = ref_report.get("Extracted References", [])
+
     heading_issues = check_headings(text)
     table_issues = check_tables_figures(text)
 
@@ -120,34 +111,32 @@ if uploaded_file:
             st.markdown(f"{i}. {ref}")
 
     st.subheader("🧾 Formatting & Style Check")
+    show_checklist("🔤 Font Checks", font_issues)
+    show_checklist("📐 Paragraph Format", paragraph_issues)
+    show_checklist("🧱 Margin Checks", margin_issues)
+    show_checklist("📘 Heading Structure", heading_issues)
+    show_checklist("📊 Table and Figure Captions", table_issues)
+    show_checklist("🔢 Subheading & Sub-subheading Checks", subheading_issues)
+    show_checklist("• Bullet Point Style Checks", bullet_issues)
+    show_checklist("📚 References Style Checks", ref_format_issues)
 
-    with st.expander("📊 Formatting Validation Results", expanded=True):
-        st.subheader("📝 Style and Format Issues")
-        show_checklist("🔤 Font Checks", font_issues)
-        show_checklist("📐 Paragraph Format", paragraph_issues)
-        show_checklist("📏 Margin Checks", margin_issues)
-        show_checklist("🔠 Heading Structure", heading_issues)
-        show_checklist("📊 Table and Figure Captions", table_issues)
-        show_checklist("🔢 Subheading & Sub-subheading Checks", subheading_issues)
-        show_checklist("• Bullet Point Style Checks", bullet_issues)
-        show_checklist("📚 References Style Checks", ref_format_issues)
+    formatting_txt = generate_formatting_txt_report([
+        ("Font Checks", font_issues),
+        ("Paragraph Format", paragraph_issues),
+        ("Margin Checks", margin_issues),
+        ("Heading Structure", heading_issues),
+        ("Table and Figure Captions", table_issues),
+        ("Subheading Checks", subheading_issues),
+        ("Bullet Point Checks", bullet_issues),
+        ("References Style Checks", ref_format_issues)
+    ])
 
-        formatting_txt = generate_formatting_txt_report([
-            ("Font Checks", font_issues),
-            ("Paragraph Format", paragraph_issues),
-            ("Margin Checks", margin_issues),
-            ("Heading Structure", heading_issues),
-            ("Table and Figure Captions", table_issues),
-            ("Subheading Checks", subheading_issues),
-            ("Bullet Point Checks", bullet_issues),
-            ("References Style Checks", ref_format_issues)
-        ])
-        st.download_button(
-            label="📥 Download Formatting Report (.txt)",
-            data=formatting_txt,
-            file_name="formatting_report.txt",
-            mime="text/plain"
-        )
+    st.download_button(
+        label="📥 Download Formatting Report (.txt)",
+        data=formatting_txt,
+        file_name="formatting_report.txt",
+        mime="text/plain"
+    )
 
     if st.button("📄 Download Full Report as PDF"):
         corrected_refs = correct_references(references)
@@ -168,6 +157,5 @@ if uploaded_file:
             file_name="QAJ_AI_Report.pdf",
             mime="application/pdf"
         )
-
 else:
     st.info("Upload a PDF or DOCX research article to begin analysis.")
