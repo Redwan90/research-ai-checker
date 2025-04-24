@@ -18,7 +18,7 @@ def check_self_citations(refs, author_name=""):
     return [r for r in refs if author_name.lower() in r.lower()]
 
 def check_qubahan(refs):
-    return [r for r in refs if "Qubahan Academic Journal".lower() in r.lower()]
+    return [r for r in refs if "qubahan academic journal" in r.lower()]
 
 def check_apa_format(refs):
     bold_violations = []
@@ -40,22 +40,26 @@ def check_multiple_mentions(refs):
         for author in authors:
             author_counts[author] += 1
             author_refs.setdefault(author, []).append(ref)
-    # Only authors cited more than 4 times
-    return {author: author_refs[author]
-            for author, count in author_counts.items()
-            if count > 4}
+    return {
+        author: author_refs[author]
+        for author, count in author_counts.items()
+        if count > 4
+    }
 
 def extract_intext_citations(text):
-    matches = re.findall(r"\[([^]]+)\]", text)
     cited = set()
-    for m in matches:
-        parts = re.split(r"[,\s]+", m)
-        for p in parts:
-            if '-' in p or '–' in p:
-                start, end = re.split(r"[-–]", p)
-                cited.update(range(int(start), int(end) + 1))
-            elif p.isdigit():
-                cited.add(int(p))
+    # 1) ranges like [3-5] or [3–5]
+    for m in re.finditer(r"\[(\d+)\s*[-–]\s*(\d+)\]", text):
+        start, end = map(int, m.groups())
+        cited.update(range(start, end + 1))
+    # remove those ranges so we don't parse them again
+    text_clean = re.sub(r"\[\d+\s*[-–]\s*\d+\]", "", text)
+    # 2) singles or comma-separated, e.g. [1], [1,2,5]
+    for m in re.finditer(r"\[(\d+(?:\s*,\s*\d+)*)\]", text_clean):
+        nums = re.split(r"\s*,\s*", m.group(1))
+        for num in nums:
+            if num.isdigit():
+                cited.add(int(num))
     return cited
 
 def find_missing_intext_citations(text, refs):
@@ -68,7 +72,6 @@ def check_references(text, author_name=""):
     if not refs:
         return {"error": "No references found. Ensure your document contains a 'References' section."}
 
-    # Basic stats
     results["Total References"] = len(refs)
     results["Duplicate References"] = check_duplicates(refs)
     results["Self-Citations"] = check_self_citations(refs, author_name)
@@ -77,22 +80,15 @@ def check_references(text, author_name=""):
     qaj = check_qubahan(refs)
     results["Qubahan Citations"] = qaj
     if len(qaj) > 2:
-        # citations beyond the first two are excess
         results["Excess Qubahan Citations"] = qaj[2:]
 
-    # APA style checks
     bold_v, doi_v = check_apa_format(refs)
     results["APA Style Violations"] = {
         "Missing Bold Year": bold_v,
         "Contains DOI": doi_v
     }
 
-    # Highly cited authors
     results["Highly Cited Authors (>4)"] = check_multiple_mentions(refs)
-
-    # Missing in-text citations
     results["Missing In-Text Citations"] = find_missing_intext_citations(text, refs)
-
-    # Finally the raw list
     results["Extracted References"] = refs
     return results
