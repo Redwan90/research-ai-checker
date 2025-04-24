@@ -52,25 +52,22 @@ def show_checklist(title, issues):
         st.markdown("✅ All OK")
 
 if uploaded_file:
-    # Save uploaded to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name[-5:]) as tmp:
         tmp.write(uploaded_file.read())
-        file_path = tmp.name
+        path = tmp.name
 
-    # Extract text & formatting issues
     if uploaded_file.name.endswith(".pdf"):
-        text = extract_text_from_pdf(open(file_path, "rb"))
+        text = extract_text_from_pdf(open(path, "rb"))
         font_issues = paragraph_issues = margin_issues = subheading_issues = bullet_issues = ref_format_issues = []
     else:
-        text = extract_text_from_docx(open(file_path, "rb"))
-        font_issues = check_font_and_spacing(file_path)
-        paragraph_issues = check_paragraph_format(file_path)
-        margin_issues = check_margins(file_path)
-        subheading_issues = check_subheadings(file_path)
-        bullet_issues = check_bullet_points(file_path)
-        ref_format_issues = check_reference_formatting(file_path)
+        text = extract_text_from_docx(open(path, "rb"))
+        font_issues = check_font_and_spacing(path)
+        paragraph_issues = check_paragraph_format(path)
+        margin_issues = check_margins(path)
+        subheading_issues = check_subheadings(path)
+        bullet_issues = check_bullet_points(path)
+        ref_format_issues = check_reference_formatting(path)
 
-    # Reference & author extraction
     author = extract_author_name(text)
     if author:
         st.markdown(f"**🧑‍💼 Detected Author Name:** `{author}`")
@@ -81,11 +78,10 @@ if uploaded_file:
     heading_issues = check_headings(text)
     table_issues = check_tables_figures(text)
 
-    # Display summary JSON
     st.subheader("📑 Reference Analysis Summary")
     st.json(ref_report)
 
-    # Missing in-text citations
+    # Missing in-text
     missing = ref_report.get("Missing In-Text Citations", [])
     if missing:
         st.error("❌ Some references are listed but never cited in the text.")
@@ -93,7 +89,7 @@ if uploaded_file:
     else:
         st.success("✅ All listed references are cited in the body.")
 
-    # Authors cited >4
+    # Highly cited authors >4
     cited_dict = ref_report.get("Highly Cited Authors (>4)", {})
     if cited_dict:
         st.subheader("👥 Authors Cited More Than 4 Times")
@@ -102,19 +98,19 @@ if uploaded_file:
             shown = set()
             for r in rlist:
                 if r not in shown:
-                    idxs = [i+1 for i,x in enumerate(refs) if x==r]
+                    idxs = [i+1 for i,x in enumerate(refs) if x == r]
                     for idx in idxs:
                         st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{idx}. {r}")
                     shown.add(r)
 
     # Qubahan citations
-    qaj_list = ref_report.get("Qahanan Citations", ref_report.get("Qubahan Citations", []))
+    qaj_list = ref_report.get("Qubahan Citations", [])
     if qaj_list:
         st.subheader("🔍 Qubahan Academic Journal Citations")
         st.markdown(f"Total QAJ citations: {len(qaj_list)}")
         if len(qaj_list) > 2:
             excess = ref_report.get("Excess Qubahan Citations", [])
-            st.markdown(f"❌ Only up to 2 QAJ citations allowed. {len(excess)} overage:")
+            st.error(f"❌ Only up to 2 QAJ citations allowed. {len(excess)} over:")
             for r in excess:
                 st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{r}")
 
@@ -135,7 +131,6 @@ if uploaded_file:
     show_checklist("• Bullet Point Style Checks", bullet_issues)
     show_checklist("📚 References Style Checks", ref_format_issues)
 
-    # Download formatting report
     fmt_text = generate_formatting_txt_report([
         ("Font Checks", font_issues),
         ("Paragraph Format", paragraph_issues),
@@ -144,7 +139,7 @@ if uploaded_file:
         ("Table and Figure Captions", table_issues),
         ("Subheading Checks", subheading_issues),
         ("Bullet Point Checks", bullet_issues),
-        ("References Style Checks", ref_format_issues),
+        ("References Style Checks", ref_format_issues)
     ])
     st.download_button(
         "📥 Download Formatting Report (.txt)",
@@ -153,7 +148,6 @@ if uploaded_file:
         "text/plain"
     )
 
-    # Download full PDF report
     if st.button("📄 Download Full Report as PDF"):
         corrected = correct_references(refs)
         fmt_results = {
@@ -173,6 +167,5 @@ if uploaded_file:
             "QAJ_AI_Report.pdf",
             "application/pdf"
         )
-
 else:
     st.info("Upload a PDF or DOCX research article to begin analysis.")
