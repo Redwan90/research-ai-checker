@@ -25,25 +25,23 @@ uploaded_file = st.file_uploader("📤 Upload your research article (PDF or DOCX
 def extract_author_name(text):
     match = re.search(r"\n(.*?)\n.*?\n", text)
     if match:
-        raw_line = match.group(1)
-        clean_line = re.sub(r"[\d\*]+", "", raw_line)
-        clean_line = re.sub(r"\s{2,}", " ", clean_line)
-        clean_line = clean_line.strip(",; \n")
-        return clean_line
+        raw = match.group(1)
+        clean = re.sub(r"[\d\*]+", "", raw)
+        return re.sub(r"\s{2,}", " ", clean).strip(",; \n")
     return ""
 
 def generate_formatting_txt_report(sections):
-    report = StringIO()
-    report.write("🔍 Formatting Validation Report\n\n")
+    buf = StringIO()
+    buf.write("🔍 Formatting Validation Report\n\n")
     for title, issues in sections:
-        report.write(f"=== {title} ===\n")
+        buf.write(f"=== {title} ===\n")
         if issues:
             for issue in issues:
-                report.write(f"❌ {issue}\n")
+                buf.write(f"❌ {issue}\n")
         else:
-            report.write("✅ All OK\n")
-        report.write("\n")
-    return report.getvalue()
+            buf.write("✅ All OK\n")
+        buf.write("\n")
+    return buf.getvalue()
 
 def show_checklist(title, issues):
     st.markdown(f"### {title}")
@@ -54,10 +52,12 @@ def show_checklist(title, issues):
         st.markdown("✅ All OK")
 
 if uploaded_file:
+    # Save uploaded to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=uploaded_file.name[-5:]) as tmp:
         tmp.write(uploaded_file.read())
         file_path = tmp.name
 
+    # Extract text & formatting issues
     if uploaded_file.name.endswith(".pdf"):
         text = extract_text_from_pdf(open(file_path, "rb"))
         font_issues = paragraph_issues = margin_issues = subheading_issues = bullet_issues = ref_format_issues = []
@@ -70,57 +70,73 @@ if uploaded_file:
         bullet_issues = check_bullet_points(file_path)
         ref_format_issues = check_reference_formatting(file_path)
 
-    author_name = extract_author_name(text)
-    if author_name:
-        st.markdown(f"**🧑‍💼 Detected Author Name:** `{author_name}`")
+    # Reference & author extraction
+    author = extract_author_name(text)
+    if author:
+        st.markdown(f"**🧑‍💼 Detected Author Name:** `{author}`")
 
-    ref_report = check_references(text, author_name)
-    references = ref_report.get("Extracted References", [])
+    ref_report = check_references(text, author)
+    refs = ref_report.get("Extracted References", [])
 
     heading_issues = check_headings(text)
     table_issues = check_tables_figures(text)
 
+    # Display summary JSON
     st.subheader("📑 Reference Analysis Summary")
     st.json(ref_report)
 
-    if "Missing In-Text Citations" in ref_report:
-        if ref_report["Missing In-Text Citations"]:
-            st.error("❌ Some references are listed but never cited in the text.")
-            st.markdown("**Missing In-Text Citations:**")
-            st.markdown(", ".join([f"[{num}]" for num in ref_report["Missing In-Text Citations"]]))
-        else:
-            st.success("✅ All references in the list are cited in the body.")
+    # Missing in-text citations
+    missing = ref_report.get("Missing In-Text Citations", [])
+    if missing:
+        st.error("❌ Some references are listed but never cited in the text.")
+        st.markdown("**Missing In-Text Citations:** " + ", ".join(f"[{i}]" for i in missing))
+    else:
+        st.success("✅ All listed references are cited in the body.")
 
-    if "Highly Cited Authors (≥4)" in ref_report:
-        cited = ref_report["Highly Cited Authors (≥4)"]
-        if cited:
-            st.subheader("👥 Authors Cited 4+ Times")
-            for author, refs in cited.items():
-                st.markdown(f"**{author.title()}** — {len(refs)} times")
-                shown = set()
-                for ref in refs:
-                    if ref not in shown:
-                        indices = [i + 1 for i, r in enumerate(references) if r == ref]
-                        for idx in indices:
-                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{idx}. {ref}")
-                        shown.add(ref)
+    # Authors cited >4
+    cited_dict = ref_report.get("Highly Cited Authors (>4)", {})
+    if cited_dict:
+        st.subheader("👥 Authors Cited More Than 4 Times")
+        for auth, rlist in cited_dict.items():
+            st.markdown(f"**{auth.title()}** — {len(rlist)} times")
+            shown = set()
+            for r in rlist:
+                if r not in shown:
+                    idxs = [i+1 for i,x in enumerate(refs) if x==r]
+                    for idx in idxs:
+                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{idx}. {r}")
+                    shown.add(r)
 
+    # Qubahan citations
+    qaj_list = ref_report.get("Qahanan Citations", ref_report.get("Qubahan Citations", []))
+    if qaj_list:
+        st.subheader("🔍 Qubahan Academic Journal Citations")
+        st.markdown(f"Total QAJ citations: {len(qaj_list)}")
+        if len(qaj_list) > 2:
+            excess = ref_report.get("Excess Qubahan Citations", [])
+            st.markdown(f"❌ Only up to 2 QAJ citations allowed. {len(excess)} overage:")
+            for r in excess:
+                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{r}")
+
+    # Corrected APA references
     if st.checkbox("✨ Show corrected references in APA 7 style"):
-        corrected_refs = correct_references(references)
-        for i, ref in enumerate(corrected_refs, start=1):
-            st.markdown(f"{i}. {ref}")
+        corrected = correct_references(refs)
+        for i, r in enumerate(corrected, start=1):
+            st.markdown(f"{i}. {r}")
 
+    # Formatting & Style Check
     st.subheader("🧾 Formatting & Style Check")
     show_checklist("🔤 Font Checks", font_issues)
     show_checklist("📐 Paragraph Format", paragraph_issues)
-    show_checklist("🧱 Margin Checks", margin_issues)
-    show_checklist("📘 Heading Structure", heading_issues)
+    show_checklist("📏 Margin Checks", margin_issues)
+    show_checklist("🔠 Heading Structure", heading_issues)
     show_checklist("📊 Table and Figure Captions", table_issues)
     show_checklist("🔢 Subheading & Sub-subheading Checks", subheading_issues)
     show_checklist("• Bullet Point Style Checks", bullet_issues)
     show_checklist("📚 References Style Checks", ref_format_issues)
 
-    formatting_txt = generate_formatting_txt_report([
+    # Download formatting report
+    fmt_text = generate_formatting_txt_report([
         ("Font Checks", font_issues),
         ("Paragraph Format", paragraph_issues),
         ("Margin Checks", margin_issues),
@@ -128,19 +144,19 @@ if uploaded_file:
         ("Table and Figure Captions", table_issues),
         ("Subheading Checks", subheading_issues),
         ("Bullet Point Checks", bullet_issues),
-        ("References Style Checks", ref_format_issues)
+        ("References Style Checks", ref_format_issues),
     ])
-
     st.download_button(
-        label="📥 Download Formatting Report (.txt)",
-        data=formatting_txt,
-        file_name="formatting_report.txt",
-        mime="text/plain"
+        "📥 Download Formatting Report (.txt)",
+        fmt_text,
+        "formatting_report.txt",
+        "text/plain"
     )
 
+    # Download full PDF report
     if st.button("📄 Download Full Report as PDF"):
-        corrected_refs = correct_references(references)
-        formatting_results = {
+        corrected = correct_references(refs)
+        fmt_results = {
             "Font Checks": font_issues,
             "Paragraph Format": paragraph_issues,
             "Margin Checks": margin_issues,
@@ -150,12 +166,13 @@ if uploaded_file:
             "Bullet Point Checks": bullet_issues,
             "References Style Checks": ref_format_issues
         }
-        pdf_buffer = generate_pdf_report(ref_report, corrected_refs, "", formatting_results)
+        pdf_buf = generate_pdf_report(ref_report, corrected, "", fmt_results)
         st.download_button(
-            label="📥 Download PDF",
-            data=pdf_buffer.getvalue(),
-            file_name="QAJ_AI_Report.pdf",
-            mime="application/pdf"
+            "📥 Download PDF",
+            pdf_buf.getvalue(),
+            "QAJ_AI_Report.pdf",
+            "application/pdf"
         )
+
 else:
     st.info("Upload a PDF or DOCX research article to begin analysis.")
