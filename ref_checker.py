@@ -24,7 +24,7 @@ def check_apa_format(refs):
     bold_violations = []
     doi_violations = []
     for r in refs:
-        if not re.search(r"\*\*\(\d{4}\)\*\*", r):  # e.g., **(2023)**
+        if not re.search(r"\*\*\(\d{4}\)\*\*", r):
             bold_violations.append(r)
         if "doi.org" in r.lower():
             doi_violations.append(r)
@@ -40,38 +40,27 @@ def check_multiple_mentions(refs):
         for author in authors:
             author_counts[author] += 1
             author_refs.setdefault(author, []).append(ref)
-    result = {author: author_refs[author] for author, count in author_counts.items() if count >= 4}
-    return result
+    # Only authors cited more than 4 times
+    return {author: author_refs[author]
+            for author, count in author_counts.items()
+            if count > 4}
 
 def extract_intext_citations(text):
-    """Extract all cited reference numbers in the format [1], [1-3], [4,6] etc."""
-    citation_matches = re.findall(r"\[(\d+(?:[-–]\d+)?(?:,\s*\d+(?:[-–]\d+)?)*)\]", text)
-    cited_numbers = set()
-
-    for match in citation_matches:
-        parts = match.split(',')
-        for part in parts:
-            part = part.strip()
-            if '-' in part or '–' in part:
-                try:
-                    start, end = re.split(r"[-–]", part)
-                    cited_numbers.update(range(int(start), int(end) + 1))
-                except:
-                    continue
-            else:
-                try:
-                    cited_numbers.add(int(part))
-                except:
-                    continue
-    return cited_numbers
+    matches = re.findall(r"\[([^]]+)\]", text)
+    cited = set()
+    for m in matches:
+        parts = re.split(r"[,\s]+", m)
+        for p in parts:
+            if '-' in p or '–' in p:
+                start, end = re.split(r"[-–]", p)
+                cited.update(range(int(start), int(end) + 1))
+            elif p.isdigit():
+                cited.add(int(p))
+    return cited
 
 def find_missing_intext_citations(text, refs):
     cited = extract_intext_citations(text)
-    missing = []
-    for i in range(1, len(refs) + 1):
-        if i not in cited:
-            missing.append(i)
-    return missing
+    return [i for i in range(1, len(refs) + 1) if i not in cited]
 
 def check_references(text, author_name=""):
     results = {}
@@ -79,19 +68,31 @@ def check_references(text, author_name=""):
     if not refs:
         return {"error": "No references found. Ensure your document contains a 'References' section."}
 
+    # Basic stats
     results["Total References"] = len(refs)
     results["Duplicate References"] = check_duplicates(refs)
     results["Self-Citations"] = check_self_citations(refs, author_name)
-    results["Qubahan Citations"] = check_qubahan(refs)
 
-    bold_violations, doi_violations = check_apa_format(refs)
+    # Qubahan citations: allow up to 2
+    qaj = check_qubahan(refs)
+    results["Qubahan Citations"] = qaj
+    if len(qaj) > 2:
+        # citations beyond the first two are excess
+        results["Excess Qubahan Citations"] = qaj[2:]
+
+    # APA style checks
+    bold_v, doi_v = check_apa_format(refs)
     results["APA Style Violations"] = {
-        "Missing Bold Year": bold_violations,
-        "Contains DOI": doi_violations
+        "Missing Bold Year": bold_v,
+        "Contains DOI": doi_v
     }
 
-    results["Highly Cited Authors (≥4)"] = check_multiple_mentions(refs)
-    results["Missing In-Text Citations"] = find_missing_intext_citations(text, refs)
-    results["Extracted References"] = refs
+    # Highly cited authors
+    results["Highly Cited Authors (>4)"] = check_multiple_mentions(refs)
 
+    # Missing in-text citations
+    results["Missing In-Text Citations"] = find_missing_intext_citations(text, refs)
+
+    # Finally the raw list
+    results["Extracted References"] = refs
     return results
